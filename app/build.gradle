@@ -1,0 +1,16 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.freznux.bravekiosk'
+    compileSdk 33
+
+    defaultConfig {
+        applicationId "com.freznux.bravekiosk"
+        minSdk 24
+        targetSdk 33
+        versionCode 1
+        versionName "1.0"
+    }
+}
