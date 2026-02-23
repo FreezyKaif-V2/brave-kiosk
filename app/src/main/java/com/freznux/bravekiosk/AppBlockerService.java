@@ -13,7 +13,7 @@ public class AppBlockerService extends AccessibilityService {
             if (pkg != null && pkg.toString().equals("com.android.settings")) {
                 
                 // 1. Scold the user
-                Toast.makeText(this, "are bhai padh na!", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Abe Chor, Dimag Mat Laga! Padh Padh Padh !!!", Toast.LENGTH_SHORT).show();
                 
                 // 2. Perform a global "Back" button press to kill the settings window
                 performGlobalAction(GLOBAL_ACTION_BACK);
