@@ -25,7 +25,7 @@ public class SplashActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        KioskLogger.log("Splash Screen Started");
+        KioskLogger.log("--- Splash Screen Started ---");
         
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
@@ -61,52 +61,62 @@ public class SplashActivity extends Activity {
         layout.addView(loader);
         setContentView(layout);
 
-        // --- CINEMATIC ANIMATION SEQUENCE ---
-        
-        // 1. Initial State: Oversized and invisible
+        // Animation Sequence
         title.setScaleX(1.6f); title.setScaleY(1.6f); title.setAlpha(0f);
         tagline.setScaleX(1.6f); tagline.setScaleY(1.6f); tagline.setAlpha(0f);
         loader.setAlpha(0f);
 
-        // 2. Phase 1: Shrink into focus organically
         title.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(800).setInterpolator(new OvershootInterpolator(0.8f)).start();
         tagline.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(800).setInterpolator(new DecelerateInterpolator()).start();
         loader.animate().alpha(1f).setDuration(800).start();
 
-        fetchConfigFromPi(); // Network fetch happens in the background
+        // Start Network Fetch
+        fetchConfigFromPi();
 
-        // 3. Wait for a short beat, then Phase 2: Surge forward
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             title.animate().scaleX(4f).scaleY(4f).alpha(0f).setDuration(400).setInterpolator(new AccelerateInterpolator()).start();
             tagline.animate().scaleX(4f).scaleY(4f).alpha(0f).setDuration(400).setInterpolator(new AccelerateInterpolator()).start();
             loader.animate().alpha(0f).setDuration(300).start();
             
-            // 4. Cut seamlessly to the Drawer
             new Handler(Looper.getMainLooper()).postDelayed(() -> {
                 Intent i = new Intent(SplashActivity.this, DrawerActivity.class);
                 i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
                 startActivity(i);
-                overridePendingTransition(0, 0); // No default fade, makes the "surge cut" pop
+                overridePendingTransition(0, 0); 
                 finish();
             }, 380);
-        }, 1400); // Shorter wait time
+        }, 1400); 
     }
 
     private void fetchConfigFromPi() {
         new Thread(() -> {
             try {
-                // REPLACE YOUR_PI_IP BELOW
-                String piUrl = "http://YOUR_PI_IP:5000/api/config";
+                String piUrl = "http://192.168.1.103:5000/api/config";
+                KioskLogger.log("Fetching config from: " + piUrl);
+                
                 URL url = new URL(piUrl);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setConnectTimeout(2000);
-                BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-                StringBuilder response = new StringBuilder();
-                String line;
-                while ((line = in.readLine()) != null) { response.append(line); }
-                in.close();
-                getSharedPreferences("KioskConfig", MODE_PRIVATE).edit().putString("json_data", response.toString()).apply();
-            } catch (Exception e) {}
+                conn.setConnectTimeout(3000); // 3 seconds timeout
+                conn.setReadTimeout(3000);
+                
+                int responseCode = conn.getResponseCode();
+                KioskLogger.log("Server responded with code: " + responseCode);
+                
+                if (responseCode == 200) {
+                    BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                    StringBuilder response = new StringBuilder();
+                    String line;
+                    while ((line = in.readLine()) != null) { response.append(line); }
+                    in.close();
+                    
+                    getSharedPreferences("KioskConfig", MODE_PRIVATE).edit().putString("json_data", response.toString()).apply();
+                    KioskLogger.log("Config successfully updated and saved.");
+                } else {
+                    KioskLogger.log("Fetch failed. Using cached configuration.");
+                }
+            } catch (Exception e) {
+                KioskLogger.log("Network Exception: " + e.getMessage());
+            }
         }).start();
     }
 }
