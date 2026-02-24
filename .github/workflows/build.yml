@@ -20,19 +20,8 @@ jobs:
     - name: Build Release APK
       run: gradle assembleRelease
       
-    - name: Sign APK
-      uses: r0adkll/sign-android-release@v1
-      with:
-        releaseDirectory: app/build/outputs/apk/release
-        signingKeyBase64: ${{ secrets.KEYSTORE_BASE64 }}
-        alias: ${{ secrets.KEY_ALIAS }}
-        keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
-        keyPassword: ${{ secrets.KEY_PASSWORD }}
-      env:
-        BUILD_TOOLS_VERSION: "34.0.0"
-        
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: Saif-M9-Kiosk-Release
-        path: app/build/outputs/apk/release/app-release-unsigned-signed.apk
+        path: app/build/outputs/apk/release/app-release.apk

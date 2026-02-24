@@ -6,11 +6,28 @@ android {
     namespace 'com.freznux.bravekiosk'
     compileSdk 33
 
+    signingConfigs {
+        release {
+            storeFile file("kiosk.keystore")
+            storePassword "kiosk123"
+            keyAlias "kiosk"
+            keyPassword "kiosk123"
+        }
+    }
+
     defaultConfig {
         applicationId "com.freznux.bravekiosk"
         minSdk 24
         targetSdk 33
         versionCode 1
         versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
     }
 }
