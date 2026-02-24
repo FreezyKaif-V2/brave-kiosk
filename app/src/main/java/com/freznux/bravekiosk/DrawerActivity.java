@@ -1,5 +1,6 @@
 package com.freznux.bravekiosk;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.ActivityManager;
 import android.content.Context;
@@ -20,12 +21,17 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+import com.google.zxing.integration.android.IntentIntegrator;
+import com.google.zxing.integration.android.IntentResult;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.List;
 
 public class DrawerActivity extends Activity {
+    
+    private static final int CAMERA_PERMISSION_CODE = 100;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -76,12 +82,11 @@ public class DrawerActivity extends Activity {
                 
                 ImageView img = new ImageView(this);
                 img.setImageDrawable(icon);
-                // SHRUNK ICONS for crispness (100x100 instead of 140x140)
                 img.setLayoutParams(new LinearLayout.LayoutParams(100, 100));
                 
                 TextView name = new TextView(this);
                 name.setText(appName);
-                name.setTextColor(Color.parseColor("#e2e8f0")); // Softer white
+                name.setTextColor(Color.parseColor("#e2e8f0"));
                 name.setTextSize(13f);
                 name.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
                 name.setGravity(Gravity.CENTER);
@@ -101,10 +106,23 @@ public class DrawerActivity extends Activity {
         }
         scrollContent.addView(grid);
 
-        // ACTION BUTTONS
+        // ACTION BUTTONS & SERVER STATUS
         LinearLayout actionsLayout = new LinearLayout(this);
         actionsLayout.setOrientation(LinearLayout.VERTICAL);
         actionsLayout.setPadding(20, 60, 20, 20);
+
+        SharedPreferences prefs = getSharedPreferences("KioskConfig", MODE_PRIVATE);
+        boolean isOnline = prefs.getBoolean("server_online", false);
+        String currentIp = prefs.getString("server_ip", "Not Set");
+
+        // Dynamic Network Status Button
+        if (isOnline) {
+            // Server is healthy. Blue button indicating it's just a config option.
+            actionsLayout.addView(createActionButton("📷 Change Server IP (" + currentIp + ")", "#3b82f6", v -> startQRScanner()));
+        } else {
+            // Server is unreachable. Red warning button.
+            actionsLayout.addView(createActionButton("⚠️ Server Offline - Change IP", "#dc2626", v -> startQRScanner()));
+        }
 
         actionsLayout.addView(createActionButton("🧹 Clear Recents & Optimize", "#ef4444", v -> clearRecents()));
         actionsLayout.addView(createActionButton("🔄 Refresh Dashboard", "#059669", v -> {
@@ -130,17 +148,60 @@ public class DrawerActivity extends Activity {
         btn.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         btn.setGravity(Gravity.CENTER);
         btn.setPadding(0, 35, 0, 35);
-        
         GradientDrawable shape = new GradientDrawable();
         shape.setCornerRadius(24f);
         shape.setColor(Color.parseColor(colorHex));
         btn.setBackground(shape);
-        
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
         params.setMargins(0, 0, 0, 30);
         btn.setLayoutParams(params);
         btn.setOnClickListener(listener);
         return btn;
+    }
+
+    private void startQRScanner() {
+        if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_CODE);
+        } else {
+            launchZxing();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        if (requestCode == CAMERA_PERMISSION_CODE && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            launchZxing();
+        } else {
+            Toast.makeText(this, "Camera permission required to scan IP!", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void launchZxing() {
+        IntentIntegrator integrator = new IntentIntegrator(this);
+        integrator.setPrompt("Scan Kiosk Server QR Code");
+        integrator.setBeepEnabled(true);
+        integrator.setOrientationLocked(false);
+        integrator.initiateScan();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        IntentResult result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
+        if (result != null) {
+            if (result.getContents() != null) {
+                String scannedIp = result.getContents();
+                SharedPreferences prefs = getSharedPreferences("KioskConfig", MODE_PRIVATE);
+                prefs.edit().putString("server_ip", scannedIp).apply();
+                KioskLogger.log("New Server IP Configured: " + scannedIp);
+                Toast.makeText(this, "Saved! New Server IP: " + scannedIp, Toast.LENGTH_LONG).show();
+                
+                // Reboot app to attempt fetching from new config
+                startActivity(new Intent(this, SplashActivity.class));
+                finish();
+            }
+        } else {
+            super.onActivityResult(requestCode, resultCode, data);
+        }
     }
 
     private List<String> getAllowedApps() {

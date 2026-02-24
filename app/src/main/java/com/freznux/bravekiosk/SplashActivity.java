@@ -61,7 +61,6 @@ public class SplashActivity extends Activity {
         layout.addView(loader);
         setContentView(layout);
 
-        // Animation Sequence
         title.setScaleX(1.6f); title.setScaleY(1.6f); title.setAlpha(0f);
         tagline.setScaleX(1.6f); tagline.setScaleY(1.6f); tagline.setAlpha(0f);
         loader.setAlpha(0f);
@@ -70,7 +69,7 @@ public class SplashActivity extends Activity {
         tagline.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(800).setInterpolator(new DecelerateInterpolator()).start();
         loader.animate().alpha(1f).setDuration(800).start();
 
-        // Start Network Fetch
+        // Start Network Fetch (Checks if server is alive)
         fetchConfigFromPi();
 
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
@@ -90,17 +89,20 @@ public class SplashActivity extends Activity {
 
     private void fetchConfigFromPi() {
         new Thread(() -> {
+            SharedPreferences prefs = getSharedPreferences("KioskConfig", MODE_PRIVATE);
             try {
-                String piUrl = "http://192.168.1.103:5000/api/config";
-                KioskLogger.log("Fetching config from: " + piUrl);
+                String baseIp = prefs.getString("server_ip", "http://127.0.0.1:5000");
+                String piUrl = baseIp + "/api/config";
+                KioskLogger.log("Pinging Server: " + piUrl);
                 
                 URL url = new URL(piUrl);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setConnectTimeout(3000); // 3 seconds timeout
-                conn.setReadTimeout(3000);
+                // FAST TIMEOUT: Local networks should respond in under 1 second. 
+                // If it fails, the server is offline or IP changed.
+                conn.setConnectTimeout(1000); 
+                conn.setReadTimeout(1000);
                 
                 int responseCode = conn.getResponseCode();
-                KioskLogger.log("Server responded with code: " + responseCode);
                 
                 if (responseCode == 200) {
                     BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
@@ -109,13 +111,16 @@ public class SplashActivity extends Activity {
                     while ((line = in.readLine()) != null) { response.append(line); }
                     in.close();
                     
-                    getSharedPreferences("KioskConfig", MODE_PRIVATE).edit().putString("json_data", response.toString()).apply();
-                    KioskLogger.log("Config successfully updated and saved.");
+                    prefs.edit().putString("json_data", response.toString())
+                         .putBoolean("server_online", true).apply();
+                    KioskLogger.log("Dynamic config updated. Server is ONLINE.");
                 } else {
-                    KioskLogger.log("Fetch failed. Using cached configuration.");
+                    prefs.edit().putBoolean("server_online", false).apply();
+                    KioskLogger.log("Fetch failed. Code: " + responseCode + ". Server is OFFLINE.");
                 }
             } catch (Exception e) {
-                KioskLogger.log("Network Exception: " + e.getMessage());
+                prefs.edit().putBoolean("server_online", false).apply();
+                KioskLogger.log("Network Exception: Server is OFFLINE. " + e.getMessage());
             }
         }).start();
     }
