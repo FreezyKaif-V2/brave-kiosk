@@ -98,15 +98,19 @@ public class DrawerActivity extends Activity {
                 appItem.addView(name);
                 
                 appItem.setOnClickListener(v -> {
-                    Intent intent = pm.getLaunchIntentForPackage(pkg);
-                    if (intent != null) startActivity(intent);
+                    try {
+                        Intent intent = pm.getLaunchIntentForPackage(pkg);
+                        if (intent != null) startActivity(intent);
+                    } catch (Exception e) {
+                        KioskLogger.log("Failed to launch app: " + e.getMessage());
+                    }
                 });
                 grid.addView(appItem);
             } catch (Exception e) {}
         }
         scrollContent.addView(grid);
 
-        // ACTION BUTTONS & SERVER STATUS
+        // ACTION BUTTONS
         LinearLayout actionsLayout = new LinearLayout(this);
         actionsLayout.setOrientation(LinearLayout.VERTICAL);
         actionsLayout.setPadding(20, 60, 20, 20);
@@ -115,12 +119,9 @@ public class DrawerActivity extends Activity {
         boolean isOnline = prefs.getBoolean("server_online", false);
         String currentIp = prefs.getString("server_ip", "Not Set");
 
-        // Dynamic Network Status Button
         if (isOnline) {
-            // Server is healthy. Blue button indicating it's just a config option.
             actionsLayout.addView(createActionButton("📷 Change Server IP (" + currentIp + ")", "#3b82f6", v -> startQRScanner()));
         } else {
-            // Server is unreachable. Red warning button.
             actionsLayout.addView(createActionButton("⚠️ Server Offline - Change IP", "#dc2626", v -> startQRScanner()));
         }
 
@@ -160,10 +161,14 @@ public class DrawerActivity extends Activity {
     }
 
     private void startQRScanner() {
-        if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_CODE);
-        } else {
-            launchZxing();
+        try {
+            if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_CODE);
+            } else {
+                launchZxing();
+            }
+        } catch (Exception e) {
+            KioskLogger.log("Camera Permission Error: " + e.getMessage());
         }
     }
 
@@ -177,30 +182,39 @@ public class DrawerActivity extends Activity {
     }
 
     private void launchZxing() {
-        IntentIntegrator integrator = new IntentIntegrator(this);
-        integrator.setPrompt("Scan Kiosk Server QR Code");
-        integrator.setBeepEnabled(true);
-        integrator.setOrientationLocked(false);
-        integrator.initiateScan();
+        // The Bomb-Proof Wrapper
+        try {
+            IntentIntegrator integrator = new IntentIntegrator(this);
+            integrator.setPrompt("Scan Kiosk Server QR Code");
+            integrator.setBeepEnabled(true);
+            integrator.setOrientationLocked(false);
+            integrator.initiateScan();
+        } catch (Exception e) {
+            KioskLogger.log("FATAL SCANNER CRASH PREVENTED: " + e.getMessage());
+            Toast.makeText(this, "Scanner hardware error. Check logs.", Toast.LENGTH_LONG).show();
+        }
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        IntentResult result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
-        if (result != null) {
-            if (result.getContents() != null) {
-                String scannedIp = result.getContents();
-                SharedPreferences prefs = getSharedPreferences("KioskConfig", MODE_PRIVATE);
-                prefs.edit().putString("server_ip", scannedIp).apply();
-                KioskLogger.log("New Server IP Configured: " + scannedIp);
-                Toast.makeText(this, "Saved! New Server IP: " + scannedIp, Toast.LENGTH_LONG).show();
-                
-                // Reboot app to attempt fetching from new config
-                startActivity(new Intent(this, SplashActivity.class));
-                finish();
+        try {
+            IntentResult result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
+            if (result != null) {
+                if (result.getContents() != null) {
+                    String scannedIp = result.getContents();
+                    SharedPreferences prefs = getSharedPreferences("KioskConfig", MODE_PRIVATE);
+                    prefs.edit().putString("server_ip", scannedIp).apply();
+                    KioskLogger.log("New Server IP Configured: " + scannedIp);
+                    Toast.makeText(this, "Saved! New Server IP: " + scannedIp, Toast.LENGTH_LONG).show();
+                    
+                    startActivity(new Intent(this, SplashActivity.class));
+                    finish();
+                }
+            } else {
+                super.onActivityResult(requestCode, resultCode, data);
             }
-        } else {
-            super.onActivityResult(requestCode, resultCode, data);
+        } catch (Exception e) {
+            KioskLogger.log("Activity Result Error: " + e.getMessage());
         }
     }
 
@@ -216,15 +230,19 @@ public class DrawerActivity extends Activity {
     }
 
     private void clearRecents() {
-        ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-        if (am != null) {
-            List<ApplicationInfo> packages = getPackageManager().getInstalledApplications(0);
-            for (ApplicationInfo packageInfo : packages) {
-                if ((packageInfo.flags & ApplicationInfo.FLAG_SYSTEM) == 1) continue;
-                if (packageInfo.packageName.equals(getPackageName())) continue;
-                am.killBackgroundProcesses(packageInfo.packageName);
+        try {
+            ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+            if (am != null) {
+                List<ApplicationInfo> packages = getPackageManager().getInstalledApplications(0);
+                for (ApplicationInfo packageInfo : packages) {
+                    if ((packageInfo.flags & ApplicationInfo.FLAG_SYSTEM) == 1) continue;
+                    if (packageInfo.packageName.equals(getPackageName())) continue;
+                    am.killBackgroundProcesses(packageInfo.packageName);
+                }
+                Toast.makeText(this, "Memory Optimized.", Toast.LENGTH_SHORT).show();
             }
-            Toast.makeText(this, "Memory Optimized.", Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            KioskLogger.log("Clear Recents Error: " + e.getMessage());
         }
     }
 }
