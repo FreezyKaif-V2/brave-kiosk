@@ -41,19 +41,18 @@ public class DrawerActivity extends Activity {
         TextView header = new TextView(this);
         header.setText("Study Tools");
         header.setTextColor(Color.WHITE);
-        header.setTextSize(32f);
-        header.setTypeface(null, Typeface.BOLD);
+        header.setTextSize(34f);
+        header.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
         header.setGravity(Gravity.CENTER);
-        header.setPadding(0, 0, 0, 40);
+        header.setPadding(0, 0, 0, 50);
         mainLayout.addView(header);
 
         ScrollView scrollView = new ScrollView(this);
         LinearLayout scrollContent = new LinearLayout(this);
         scrollContent.setOrientation(LinearLayout.VERTICAL);
 
-        // GRID LAYOUT FOR APPS
         GridLayout grid = new GridLayout(this);
-        grid.setColumnCount(4); // 4 columns for a compact drawer feel
+        grid.setColumnCount(4);
         grid.setAlignmentMode(GridLayout.ALIGN_MARGINS);
         grid.setUseDefaultMargins(true);
 
@@ -64,7 +63,6 @@ public class DrawerActivity extends Activity {
                 String appName = pm.getApplicationLabel(info).toString();
                 Drawable icon = pm.getApplicationIcon(info);
                 
-                // Create individual grid items
                 LinearLayout appItem = new LinearLayout(this);
                 appItem.setOrientation(LinearLayout.VERTICAL);
                 appItem.setGravity(Gravity.CENTER);
@@ -78,12 +76,14 @@ public class DrawerActivity extends Activity {
                 
                 ImageView img = new ImageView(this);
                 img.setImageDrawable(icon);
-                img.setLayoutParams(new LinearLayout.LayoutParams(140, 140));
+                // SHRUNK ICONS for crispness (100x100 instead of 140x140)
+                img.setLayoutParams(new LinearLayout.LayoutParams(100, 100));
                 
                 TextView name = new TextView(this);
                 name.setText(appName);
-                name.setTextColor(Color.WHITE);
-                name.setTextSize(14f);
+                name.setTextColor(Color.parseColor("#e2e8f0")); // Softer white
+                name.setTextSize(13f);
+                name.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
                 name.setGravity(Gravity.CENTER);
                 name.setSingleLine(true);
                 name.setEllipsize(TextUtils.TruncateAt.END);
@@ -93,7 +93,6 @@ public class DrawerActivity extends Activity {
                 appItem.addView(name);
                 
                 appItem.setOnClickListener(v -> {
-                    KioskLogger.log("Launched: " + appName);
                     Intent intent = pm.getLaunchIntentForPackage(pkg);
                     if (intent != null) startActivity(intent);
                 });
@@ -102,7 +101,7 @@ public class DrawerActivity extends Activity {
         }
         scrollContent.addView(grid);
 
-        // ACTION BUTTONS (Sleek List Below Grid)
+        // ACTION BUTTONS
         LinearLayout actionsLayout = new LinearLayout(this);
         actionsLayout.setOrientation(LinearLayout.VERTICAL);
         actionsLayout.setPadding(20, 60, 20, 20);
@@ -110,6 +109,7 @@ public class DrawerActivity extends Activity {
         actionsLayout.addView(createActionButton("🧹 Clear Recents & Optimize", "#ef4444", v -> clearRecents()));
         actionsLayout.addView(createActionButton("🔄 Refresh Dashboard", "#059669", v -> {
             startActivity(new Intent(this, SplashActivity.class));
+            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
             finish();
         }));
         actionsLayout.addView(createActionButton("📋 View System Logs", "#d97706", v -> {
@@ -127,12 +127,12 @@ public class DrawerActivity extends Activity {
         btn.setText(text);
         btn.setTextColor(Color.WHITE);
         btn.setTextSize(16f);
-        btn.setTypeface(null, Typeface.BOLD);
+        btn.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         btn.setGravity(Gravity.CENTER);
         btn.setPadding(0, 35, 0, 35);
         
         GradientDrawable shape = new GradientDrawable();
-        shape.setCornerRadius(20f);
+        shape.setCornerRadius(24f);
         shape.setColor(Color.parseColor(colorHex));
         btn.setBackground(shape);
         
@@ -163,8 +163,7 @@ public class DrawerActivity extends Activity {
                 if (packageInfo.packageName.equals(getPackageName())) continue;
                 am.killBackgroundProcesses(packageInfo.packageName);
             }
-            Toast.makeText(this, "Memory Optimized. Recents cleared.", Toast.LENGTH_SHORT).show();
-            KioskLogger.log("Recents successfully cleared.");
+            Toast.makeText(this, "Memory Optimized.", Toast.LENGTH_SHORT).show();
         }
     }
 }
