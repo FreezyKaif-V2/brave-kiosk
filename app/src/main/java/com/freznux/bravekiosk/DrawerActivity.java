@@ -6,8 +6,12 @@ import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
-import android.widget.Button;
+import android.view.Gravity;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -20,20 +24,21 @@ public class DrawerActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        buildUI();
+        buildAestheticUI();
     }
 
-    private void buildUI() {
+    private void buildAestheticUI() {
         LinearLayout mainLayout = new LinearLayout(this);
         mainLayout.setOrientation(LinearLayout.VERTICAL);
-        mainLayout.setBackgroundColor(Color.parseColor("#1e293b"));
-        mainLayout.setPadding(40, 40, 40, 40);
+        mainLayout.setBackgroundColor(Color.parseColor("#0f172a"));
+        mainLayout.setPadding(60, 80, 60, 40);
 
         TextView header = new TextView(this);
-        header.setText("Allowed Applications");
+        header.setText("Study Tools");
         header.setTextColor(Color.WHITE);
-        header.setTextSize(24f);
-        header.setPadding(0, 0, 0, 40);
+        header.setTextSize(28f);
+        header.setTypeface(null, Typeface.BOLD);
+        header.setPadding(0, 0, 0, 60);
         mainLayout.addView(header);
 
         ScrollView scrollView = new ScrollView(this);
@@ -45,54 +50,80 @@ public class DrawerActivity extends Activity {
             try {
                 ApplicationInfo info = pm.getApplicationInfo(pkg, 0);
                 String appName = pm.getApplicationLabel(info).toString();
+                Drawable icon = pm.getApplicationIcon(info);
                 
-                Button btn = new Button(this);
-                btn.setText(appName);
-                btn.setBackgroundColor(Color.parseColor("#3b82f6"));
-                btn.setTextColor(Color.WHITE);
-                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
-                params.setMargins(0, 0, 0, 20);
-                btn.setLayoutParams(params);
+                // Create sleek card for each app
+                LinearLayout card = new LinearLayout(this);
+                card.setOrientation(LinearLayout.HORIZONTAL);
+                card.setGravity(Gravity.CENTER_VERTICAL);
+                card.setPadding(40, 30, 40, 30);
                 
-                btn.setOnClickListener(v -> {
-                    KioskLogger.log("Launching: " + pkg);
+                GradientDrawable shape = new GradientDrawable();
+                shape.setCornerRadius(24f);
+                shape.setColor(Color.parseColor("#1e293b")); // Lighter slate
+                card.setBackground(shape);
+                
+                LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(-1, -2);
+                cardParams.setMargins(0, 0, 0, 30);
+                card.setLayoutParams(cardParams);
+                
+                ImageView img = new ImageView(this);
+                img.setImageDrawable(icon);
+                img.setLayoutParams(new LinearLayout.LayoutParams(100, 100));
+                
+                TextView name = new TextView(this);
+                name.setText(appName);
+                name.setTextColor(Color.WHITE);
+                name.setTextSize(20f);
+                name.setPadding(40, 0, 0, 0);
+                
+                card.addView(img);
+                card.addView(name);
+                
+                card.setOnClickListener(v -> {
+                    KioskLogger.log("Launched: " + appName);
                     Intent intent = pm.getLaunchIntentForPackage(pkg);
                     if (intent != null) startActivity(intent);
                 });
-                appList.addView(btn);
+                appList.addView(card);
             } catch (Exception e) {
-                KioskLogger.log("App not installed: " + pkg);
+                KioskLogger.log("App not found: " + pkg);
             }
         }
 
-        // --- Action Buttons ---
-        Button refreshBtn = new Button(this);
-        refreshBtn.setText("🔄 Refresh Dashboard");
-        refreshBtn.setBackgroundColor(Color.parseColor("#10b981"));
-        refreshBtn.setTextColor(Color.WHITE);
-        refreshBtn.setOnClickListener(v -> {
-            KioskLogger.log("Manual Refresh Triggered");
+        // Action Buttons at the bottom
+        appList.addView(createActionButton("🔄 Refresh Dashboard", "#059669", v -> {
             startActivity(new Intent(this, SplashActivity.class));
             finish();
-        });
+        }));
         
-        Button logsBtn = new Button(this);
-        logsBtn.setText("📋 View System Logs");
-        logsBtn.setBackgroundColor(Color.parseColor("#f59e0b"));
-        logsBtn.setTextColor(Color.WHITE);
-        logsBtn.setOnClickListener(v -> startActivity(new Intent(this, LogsActivity.class)));
+        appList.addView(createActionButton("📋 View System Logs", "#d97706", v -> {
+            startActivity(new Intent(this, LogsActivity.class));
+        }));
 
-        LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(-1, -2);
-        btnParams.setMargins(0, 40, 0, 20);
-        refreshBtn.setLayoutParams(btnParams);
-        logsBtn.setLayoutParams(btnParams);
-
-        appList.addView(refreshBtn);
-        appList.addView(logsBtn);
-        
         scrollView.addView(appList);
         mainLayout.addView(scrollView);
         setContentView(mainLayout);
+    }
+
+    private TextView createActionButton(String text, String colorHex, android.view.View.OnClickListener listener) {
+        TextView btn = new TextView(this);
+        btn.setText(text);
+        btn.setTextColor(Color.WHITE);
+        btn.setTextSize(18f);
+        btn.setGravity(Gravity.CENTER);
+        btn.setPadding(0, 30, 0, 30);
+        
+        GradientDrawable shape = new GradientDrawable();
+        shape.setCornerRadius(24f);
+        shape.setColor(Color.parseColor(colorHex));
+        btn.setBackground(shape);
+        
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+        params.setMargins(0, 30, 0, 0);
+        btn.setLayoutParams(params);
+        btn.setOnClickListener(listener);
+        return btn;
     }
 
     private List<String> getAllowedApps() {
@@ -102,9 +133,7 @@ public class DrawerActivity extends Activity {
         try {
             JSONArray arr = new JSONObject(json).getJSONArray("allowed_apps");
             for (int i=0; i<arr.length(); i++) list.add(arr.getString(i));
-        } catch (Exception e) {
-            KioskLogger.log("JSON Parse Error: " + e.getMessage());
-        }
+        } catch (Exception e) {}
         return list;
     }
 }
