@@ -19,12 +19,12 @@ public class SplashActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        KioskLogger.log("Splash Screen Started");
         
-        // Build the sleek UI programmatically
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setGravity(Gravity.CENTER);
-        layout.setBackgroundColor(Color.parseColor("#0f172a")); // Sleek dark blue
+        layout.setBackgroundColor(Color.parseColor("#0f172a"));
         
         TextView title = new TextView(this);
         title.setText("Saif M9 Kiosk");
@@ -49,10 +49,17 @@ public class SplashActivity extends Activity {
     private void fetchConfigFromPi() {
         new Thread(() -> {
             try {
-                // REPLACE 'YOUR_PI_IP' WITH YOUR ACTUAL PI IP ADDRESS BEFORE RUNNING THIS SCRIPT
-                URL url = new URL("http://192.168.1.103:5000/api/config");
+                // REPLACE YOUR_PI_IP BELOW
+                String piUrl = "http://192.168.1.103:5000/api/config";
+                KioskLogger.log("Attempting to fetch: " + piUrl);
+                
+                URL url = new URL(piUrl);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setConnectTimeout(3000);
+                
+                int status = conn.getResponseCode();
+                KioskLogger.log("Server Response Code: " + status);
+                
                 BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
                 StringBuilder response = new StringBuilder();
                 String line;
@@ -61,17 +68,17 @@ public class SplashActivity extends Activity {
                 
                 SharedPreferences prefs = getSharedPreferences("KioskConfig", MODE_PRIVATE);
                 prefs.edit().putString("json_data", response.toString()).apply();
+                KioskLogger.log("Successfully saved config to device.");
             } catch (Exception e) {
-                // Ignore failure, we will just use the last cached version
+                KioskLogger.log("Network Error: " + e.getMessage());
             }
             
-            // Wait 3 seconds to let them read the scolding, then return to Drawer
             new Handler(Looper.getMainLooper()).postDelayed(() -> {
                 Intent i = new Intent(SplashActivity.this, DrawerActivity.class);
                 i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
                 startActivity(i);
                 finish();
-            }, 3000);
+            }, 2500);
         }).start();
     }
 }

@@ -5,12 +5,14 @@
     <queries>
         <package android:name="com.brave.browser" />
     </queries>
+    
     <application
         android:label="Saif M9 Kiosk"
+        android:usesCleartextTraffic="true" 
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
         
         <activity
-            android:name=".DrawerActivity"
+            android:name=".SplashActivity"
             android:exported="true"
             android:launchMode="singleTask"
             android:stateNotNeeded="true">
@@ -21,10 +23,8 @@
             </intent-filter>
         </activity>
 
-        <activity 
-            android:name=".SplashActivity" 
-            android:exported="false"
-            android:noHistory="true" />
+        <activity android:name=".DrawerActivity" android:exported="false" />
+        <activity android:name=".LogsActivity" android:exported="false" />
             
         <service 
             android:name=".AppBlockerService"

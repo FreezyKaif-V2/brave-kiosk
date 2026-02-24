@@ -1,20 +1,16 @@
 package com.freznux.bravekiosk;
 
 import android.app.Activity;
-import android.app.ActivityManager;
-import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.os.Bundle;
-import android.view.Gravity;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
-import android.widget.Toast;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.util.ArrayList;
@@ -24,16 +20,10 @@ public class DrawerActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        buildDrawerUI();
+        buildUI();
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        buildDrawerUI(); // Refresh apps if config changed
-    }
-
-    private void buildDrawerUI() {
+    private void buildUI() {
         LinearLayout mainLayout = new LinearLayout(this);
         mainLayout.setOrientation(LinearLayout.VERTICAL);
         mainLayout.setBackgroundColor(Color.parseColor("#1e293b"));
@@ -50,10 +40,8 @@ public class DrawerActivity extends Activity {
         LinearLayout appList = new LinearLayout(this);
         appList.setOrientation(LinearLayout.VERTICAL);
 
-        List<String> allowedApps = getAllowedApps();
         PackageManager pm = getPackageManager();
-
-        for (String pkg : allowedApps) {
+        for (String pkg : getAllowedApps()) {
             try {
                 ApplicationInfo info = pm.getApplicationInfo(pkg, 0);
                 String appName = pm.getApplicationLabel(info).toString();
@@ -62,34 +50,46 @@ public class DrawerActivity extends Activity {
                 btn.setText(appName);
                 btn.setBackgroundColor(Color.parseColor("#3b82f6"));
                 btn.setTextColor(Color.WHITE);
-                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
                 params.setMargins(0, 0, 0, 20);
                 btn.setLayoutParams(params);
                 
                 btn.setOnClickListener(v -> {
-                    Intent launchIntent = pm.getLaunchIntentForPackage(pkg);
-                    if (launchIntent != null) {
-                        startActivity(launchIntent);
-                    }
+                    KioskLogger.log("Launching: " + pkg);
+                    Intent intent = pm.getLaunchIntentForPackage(pkg);
+                    if (intent != null) startActivity(intent);
                 });
                 appList.addView(btn);
-            } catch (Exception e) {}
+            } catch (Exception e) {
+                KioskLogger.log("App not installed: " + pkg);
+            }
         }
 
-        // Add the Clear Recents Button
-        Button clearBtn = new Button(this);
-        clearBtn.setText("Clear Recents & Optimize");
-        clearBtn.setBackgroundColor(Color.parseColor("#ef4444")); // Red button
-        clearBtn.setTextColor(Color.WHITE);
-        clearBtn.setOnClickListener(v -> clearRecents());
+        // --- Action Buttons ---
+        Button refreshBtn = new Button(this);
+        refreshBtn.setText("🔄 Refresh Dashboard");
+        refreshBtn.setBackgroundColor(Color.parseColor("#10b981"));
+        refreshBtn.setTextColor(Color.WHITE);
+        refreshBtn.setOnClickListener(v -> {
+            KioskLogger.log("Manual Refresh Triggered");
+            startActivity(new Intent(this, SplashActivity.class));
+            finish();
+        });
         
-        LinearLayout.LayoutParams clearParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        clearParams.setMargins(0, 80, 0, 0);
-        clearBtn.setLayoutParams(clearParams);
-        appList.addView(clearBtn);
+        Button logsBtn = new Button(this);
+        logsBtn.setText("📋 View System Logs");
+        logsBtn.setBackgroundColor(Color.parseColor("#f59e0b"));
+        logsBtn.setTextColor(Color.WHITE);
+        logsBtn.setOnClickListener(v -> startActivity(new Intent(this, LogsActivity.class)));
 
+        LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(-1, -2);
+        btnParams.setMargins(0, 40, 0, 20);
+        refreshBtn.setLayoutParams(btnParams);
+        logsBtn.setLayoutParams(btnParams);
+
+        appList.addView(refreshBtn);
+        appList.addView(logsBtn);
+        
         scrollView.addView(appList);
         mainLayout.addView(scrollView);
         setContentView(mainLayout);
@@ -100,25 +100,11 @@ public class DrawerActivity extends Activity {
         SharedPreferences prefs = getSharedPreferences("KioskConfig", MODE_PRIVATE);
         String json = prefs.getString("json_data", "{\"allowed_apps\":[\"com.brave.browser\"]}");
         try {
-            JSONObject obj = new JSONObject(json);
-            JSONArray arr = obj.getJSONArray("allowed_apps");
-            for (int i=0; i<arr.length(); i++) {
-                list.add(arr.getString(i));
-            }
-        } catch (Exception e) {}
-        return list;
-    }
-
-    private void clearRecents() {
-        ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-        if (am != null) {
-            List<ApplicationInfo> packages = getPackageManager().getInstalledApplications(0);
-            for (ApplicationInfo packageInfo : packages) {
-                if ((packageInfo.flags & ApplicationInfo.FLAG_SYSTEM) == 1) continue;
-                if (packageInfo.packageName.equals(getPackageName())) continue;
-                am.killBackgroundProcesses(packageInfo.packageName);
-            }
-            Toast.makeText(this, "Memory optimized. Recents cleared.", Toast.LENGTH_SHORT).show();
+            JSONArray arr = new JSONObject(json).getJSONArray("allowed_apps");
+            for (int i=0; i<arr.length(); i++) list.add(arr.getString(i));
+        } catch (Exception e) {
+            KioskLogger.log("JSON Parse Error: " + e.getMessage());
         }
+        return list;
     }
 }
