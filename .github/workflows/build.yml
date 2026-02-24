@@ -18,7 +18,6 @@ jobs:
       run: gradle assembleRelease
     - name: Sign APK
       uses: r0adkll/sign-android-release@v1
-      name: Sign app APK
       with:
         releaseDirectory: app/build/outputs/apk/release
         signingKeyBase64: ${{ secrets.KEYSTORE_BASE64 }}

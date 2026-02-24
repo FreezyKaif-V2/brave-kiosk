@@ -2,54 +2,77 @@ package com.freznux.bravekiosk;
 
 import android.accessibilityservice.AccessibilityService;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.Toast;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import java.util.List;
 
 public class AppBlockerService extends AccessibilityService {
+    
+    private long lastActiveTime = System.currentTimeMillis();
+    private static final long THIRTY_MINUTES = 30 * 60 * 1000;
+
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
+        long now = System.currentTimeMillis();
+        
+        // Timeout Logic: If it has been > 30 mins since the last interaction, trigger splash
+        if (now - lastActiveTime > THIRTY_MINUTES) {
+            lastActiveTime = now;
+            Intent intent = new Intent(this, SplashActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            startActivity(intent);
+            return;
+        }
+        lastActiveTime = now; // Reset timer on any interaction
+
         CharSequence pkg = event.getPackageName();
         if (pkg == null) return;
 
-        // 1. Block the Settings App
-        if (pkg.toString().equals("com.android.settings")) {
+        // Dynamic Block Checking
+        if (isAppBlocked(pkg.toString())) {
             scoldAndKick();
             return;
         }
 
-        // 2. Block YouTube inside Brave Browser
+        // YouTube specific URL blocking in Brave
         if (pkg.toString().equals("com.brave.browser")) {
             AccessibilityNodeInfo root = getRootInActiveWindow();
             if (root != null) {
-                // Find Brave's URL bar text
                 List<AccessibilityNodeInfo> urlBars = root.findAccessibilityNodeInfosByViewId("com.brave.browser:id/url_bar");
-                if (!urlBars.isEmpty()) {
-                    CharSequence url = urlBars.get(0).getText();
-                    if (url != null) {
-                        String urlStr = url.toString().toLowerCase();
-                        
-                        // Trigger if they are on YouTube (Modify "your-kiosk-domain" to your actual site)
-                        if ((urlStr.contains("youtube.com") || urlStr.contains("youtu.be")) 
-                             && !urlStr.contains("your-kiosk-domain.com")) {
-                            scoldAndKick();
-                        }
+                if (!urlBars.isEmpty() && urlBars.get(0).getText() != null) {
+                    String urlStr = urlBars.get(0).getText().toString().toLowerCase();
+                    if ((urlStr.contains("youtube.com") || urlStr.contains("youtu.be")) 
+                         && !urlStr.contains("your-kiosk-domain")) {
+                        scoldAndKick();
                     }
                 }
             }
         }
     }
 
+    private boolean isAppBlocked(String packageName) {
+        SharedPreferences prefs = getSharedPreferences("KioskConfig", MODE_PRIVATE);
+        String json = prefs.getString("json_data", "{\"blocked_apps\":[\"com.android.settings\"]}");
+        try {
+            JSONObject obj = new JSONObject(json);
+            JSONArray arr = obj.getJSONArray("blocked_apps");
+            for (int i=0; i<arr.length(); i++) {
+                if (arr.getString(i).equals(packageName)) return true;
+            }
+        } catch (Exception e) {}
+        return false;
+    }
+
     private void scoldAndKick() {
         Toast.makeText(this, "are bhai padh na!", Toast.LENGTH_SHORT).show();
         performGlobalAction(GLOBAL_ACTION_BACK);
-
-        Intent intent = getPackageManager().getLaunchIntentForPackage("com.brave.browser");
-        if (intent != null) {
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            startActivity(intent);
-        }
+        Intent intent = new Intent(this, SplashActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        startActivity(intent);
     }
 
     @Override
