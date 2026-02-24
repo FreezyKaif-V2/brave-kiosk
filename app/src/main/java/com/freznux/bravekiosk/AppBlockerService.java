@@ -3,6 +3,9 @@ package com.freznux.bravekiosk;
 import android.accessibilityservice.AccessibilityService;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.Toast;
@@ -19,7 +22,7 @@ public class AppBlockerService extends AccessibilityService {
     public void onAccessibilityEvent(AccessibilityEvent event) {
         long now = System.currentTimeMillis();
         
-        // Timeout Logic: If it has been > 30 mins since the last interaction, trigger splash
+        // Timeout Logic
         if (now - lastActiveTime > THIRTY_MINUTES) {
             lastActiveTime = now;
             Intent intent = new Intent(this, SplashActivity.class);
@@ -27,18 +30,18 @@ public class AppBlockerService extends AccessibilityService {
             startActivity(intent);
             return;
         }
-        lastActiveTime = now; // Reset timer on any interaction
+        lastActiveTime = now; 
 
         CharSequence pkg = event.getPackageName();
         if (pkg == null) return;
 
-        // Dynamic Block Checking
+        // General App Block Checking
         if (isAppBlocked(pkg.toString())) {
             scoldAndKick();
             return;
         }
 
-        // YouTube specific URL blocking in Brave
+        // YouTube specific loop-breaking trap
         if (pkg.toString().equals("com.brave.browser")) {
             AccessibilityNodeInfo root = getRootInActiveWindow();
             if (root != null) {
@@ -47,7 +50,7 @@ public class AppBlockerService extends AccessibilityService {
                     String urlStr = urlBars.get(0).getText().toString().toLowerCase();
                     if ((urlStr.contains("youtube.com") || urlStr.contains("youtu.be")) 
                          && !urlStr.contains("your-kiosk-domain")) {
-                        scoldAndKick();
+                        breakBraveLoop();
                     }
                 }
             }
@@ -73,6 +76,23 @@ public class AppBlockerService extends AccessibilityService {
         Intent intent = new Intent(this, SplashActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         startActivity(intent);
+    }
+
+    private void breakBraveLoop() {
+        Toast.makeText(this, "Distraction Blocked! Padhai karle.", Toast.LENGTH_SHORT).show();
+        
+        // 1. Force Brave to navigate away from YouTube (Overwrites the saved tab state)
+        Intent resetIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://google.com"));
+        resetIntent.setPackage("com.brave.browser");
+        resetIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        startActivity(resetIntent);
+
+        // 2. Wait half a second for the URL to change, then kick them to the Splash Screen
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            Intent homeIntent = new Intent(this, SplashActivity.class);
+            homeIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            startActivity(homeIntent);
+        }, 500);
     }
 
     @Override
