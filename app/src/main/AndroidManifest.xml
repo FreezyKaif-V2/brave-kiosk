@@ -29,7 +29,7 @@
         <activity 
             android:name="com.journeyapps.barcodescanner.CaptureActivity" 
             android:screenOrientation="fullSensor" 
-            android:theme="@style/zxing_CaptureTheme"
+            android:theme="@style/ScannerTheme"
             tools:replace="screenOrientation,theme" />
             
         <service android:name=".AppBlockerService" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:exported="true">
