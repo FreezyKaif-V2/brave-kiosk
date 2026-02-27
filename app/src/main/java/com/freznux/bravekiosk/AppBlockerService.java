@@ -14,13 +14,19 @@ import java.util.List;
 public class AppBlockerService extends AccessibilityService {
     
     private long lastActiveTime = System.currentTimeMillis();
-    private long lastRedirectTime = 0; // The Debounce Timer
+    private long lastRedirectTime = 0;
     private static final long THIRTY_MINUTES = 30 * 60 * 1000;
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        long now = System.currentTimeMillis();
+        SharedPreferences prefs = getSharedPreferences("KioskConfig", MODE_PRIVATE);
         
+        // IF KIOSK IS EXITED/PAUSED, DO NOT BLOCK ANYTHING
+        if (prefs.getBoolean("kiosk_paused", false)) {
+            return;
+        }
+
+        long now = System.currentTimeMillis();
         if (now - lastActiveTime > THIRTY_MINUTES) {
             lastActiveTime = now;
             Intent intent = new Intent(this, SplashActivity.class);
@@ -33,7 +39,7 @@ public class AppBlockerService extends AccessibilityService {
         CharSequence pkg = event.getPackageName();
         if (pkg == null) return;
 
-        if (isAppBlocked(pkg.toString())) {
+        if (isAppBlocked(pkg.toString(), prefs)) {
             scoldAndKick();
             return;
         }
@@ -46,8 +52,6 @@ public class AppBlockerService extends AccessibilityService {
                     String urlStr = urlBars.get(0).getText().toString().toLowerCase();
                     if ((urlStr.contains("youtube.com") || urlStr.contains("youtu.be")) 
                          && !urlStr.contains("saifm9kiosk.netlify.app")) {
-                         
-                        // DEBOUNCE: Only allow a redirect once every 3 seconds
                         if (now - lastRedirectTime > 3000) {
                             lastRedirectTime = now;
                             breakBraveLoop();
@@ -58,8 +62,7 @@ public class AppBlockerService extends AccessibilityService {
         }
     }
 
-    private boolean isAppBlocked(String packageName) {
-        SharedPreferences prefs = getSharedPreferences("KioskConfig", MODE_PRIVATE);
+    private boolean isAppBlocked(String packageName, SharedPreferences prefs) {
         String json = prefs.getString("json_data", "{\"blocked_apps\":[\"com.android.settings\"]}");
         try {
             JSONArray arr = new JSONObject(json).getJSONArray("blocked_apps");
@@ -80,10 +83,8 @@ public class AppBlockerService extends AccessibilityService {
 
     private void breakBraveLoop() {
         Toast.makeText(this, "Redirecting to Study Portal...", Toast.LENGTH_SHORT).show();
-        
         Intent resetIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://saifm9kiosk.netlify.app"));
         resetIntent.setPackage("com.brave.browser");
-        // FLAG_ACTIVITY_SINGLE_TOP tells Brave to use the existing tab if possible, rather than spawning clones
         resetIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         startActivity(resetIntent);
     }

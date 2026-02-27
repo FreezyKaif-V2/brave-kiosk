@@ -3,6 +3,7 @@ package com.freznux.bravekiosk;
 import android.Manifest;
 import android.app.Activity;
 import android.app.ActivityManager;
+import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -13,8 +14,10 @@ import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.text.InputType;
 import android.text.TextUtils;
 import android.view.Gravity;
+import android.widget.EditText;
 import android.widget.GridLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -29,7 +32,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class DrawerActivity extends Activity {
-    
     private static final int CAMERA_PERMISSION_CODE = 100;
 
     @Override
@@ -39,13 +41,16 @@ public class DrawerActivity extends Activity {
     }
 
     private void buildAestheticUI() {
+        SharedPreferences prefs = getSharedPreferences("KioskConfig", MODE_PRIVATE);
+        String kioskName = prefs.getString("kiosk_name", "Saif M9 Kiosk");
+    
         LinearLayout mainLayout = new LinearLayout(this);
         mainLayout.setOrientation(LinearLayout.VERTICAL);
         mainLayout.setBackgroundColor(Color.parseColor("#0f172a"));
         mainLayout.setPadding(40, 60, 40, 40);
 
         TextView header = new TextView(this);
-        header.setText("Study Tools");
+        header.setText(kioskName);
         header.setTextColor(Color.WHITE);
         header.setTextSize(34f);
         header.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
@@ -101,9 +106,7 @@ public class DrawerActivity extends Activity {
                     try {
                         Intent intent = pm.getLaunchIntentForPackage(pkg);
                         if (intent != null) startActivity(intent);
-                    } catch (Exception e) {
-                        KioskLogger.log("Failed to launch app: " + e.getMessage());
-                    }
+                    } catch (Exception e) {}
                 });
                 grid.addView(appItem);
             } catch (Exception e) {}
@@ -115,7 +118,6 @@ public class DrawerActivity extends Activity {
         actionsLayout.setOrientation(LinearLayout.VERTICAL);
         actionsLayout.setPadding(20, 60, 20, 20);
 
-        SharedPreferences prefs = getSharedPreferences("KioskConfig", MODE_PRIVATE);
         boolean isOnline = prefs.getBoolean("server_online", false);
         String currentIp = prefs.getString("server_ip", "Not Set");
 
@@ -125,20 +127,39 @@ public class DrawerActivity extends Activity {
             actionsLayout.addView(createActionButton("⚠️ Server Offline - Change IP", "#dc2626", v -> startQRScanner()));
         }
 
-        actionsLayout.addView(createActionButton("🧹 Clear Recents & Optimize", "#ef4444", v -> clearRecents()));
-        actionsLayout.addView(createActionButton("🔄 Refresh Dashboard", "#059669", v -> {
-            startActivity(new Intent(this, SplashActivity.class));
-            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
-            finish();
-        }));
-        actionsLayout.addView(createActionButton("📋 View System Logs", "#d97706", v -> {
-            startActivity(new Intent(this, LogsActivity.class));
-        }));
+        actionsLayout.addView(createActionButton("🧹 Clear Recents & Optimize", "#059669", v -> clearRecents()));
+        
+        // --- NEW EXIT BUTTON ---
+        actionsLayout.addView(createActionButton("🚪 Exit Kiosk Mode", "#ef4444", v -> showExitDialog()));
 
         scrollContent.addView(actionsLayout);
         scrollView.addView(scrollContent);
         mainLayout.addView(scrollView);
         setContentView(mainLayout);
+    }
+
+    private void showExitDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert);
+        builder.setTitle("Enter Admin PIN to Exit");
+
+        final EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+        input.setGravity(Gravity.CENTER);
+        input.setTextColor(Color.WHITE);
+        builder.setView(input);
+
+        builder.setPositiveButton("Exit", (dialog, which) -> {
+            if (input.getText().toString().equals("0192")) {
+                // Pause the blocker and launch settings
+                getSharedPreferences("KioskConfig", MODE_PRIVATE).edit().putBoolean("kiosk_paused", true).apply();
+                Toast.makeText(DrawerActivity.this, "Kiosk Paused. Change Default Launcher in Settings.", Toast.LENGTH_LONG).show();
+                startActivity(new Intent(android.provider.Settings.ACTION_HOME_SETTINGS));
+            } else {
+                Toast.makeText(DrawerActivity.this, "Incorrect PIN", Toast.LENGTH_SHORT).show();
+            }
+        });
+        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
+        builder.show();
     }
 
     private TextView createActionButton(String text, String colorHex, android.view.View.OnClickListener listener) {
@@ -164,58 +185,29 @@ public class DrawerActivity extends Activity {
         try {
             if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_CODE);
-            } else {
-                launchZxing();
-            }
-        } catch (Exception e) {
-            KioskLogger.log("Camera Permission Error: " + e.getMessage());
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        if (requestCode == CAMERA_PERMISSION_CODE && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            launchZxing();
-        } else {
-            Toast.makeText(this, "Camera permission required to scan IP!", Toast.LENGTH_SHORT).show();
-        }
+            } else { launchZxing(); }
+        } catch (Exception e) {}
     }
 
     private void launchZxing() {
-        // The Bomb-Proof Wrapper
         try {
             IntentIntegrator integrator = new IntentIntegrator(this);
-            integrator.setPrompt("Scan Kiosk Server QR Code");
-            integrator.setBeepEnabled(true);
+            integrator.setPrompt("Scan Server QR Code");
             integrator.setOrientationLocked(false);
             integrator.initiateScan();
-        } catch (Exception e) {
-            KioskLogger.log("FATAL SCANNER CRASH PREVENTED: " + e.getMessage());
-            Toast.makeText(this, "Scanner hardware error. Check logs.", Toast.LENGTH_LONG).show();
-        }
+        } catch (Exception e) { Toast.makeText(this, "Camera error", Toast.LENGTH_SHORT).show(); }
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         try {
             IntentResult result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
-            if (result != null) {
-                if (result.getContents() != null) {
-                    String scannedIp = result.getContents();
-                    SharedPreferences prefs = getSharedPreferences("KioskConfig", MODE_PRIVATE);
-                    prefs.edit().putString("server_ip", scannedIp).apply();
-                    KioskLogger.log("New Server IP Configured: " + scannedIp);
-                    Toast.makeText(this, "Saved! New Server IP: " + scannedIp, Toast.LENGTH_LONG).show();
-                    
-                    startActivity(new Intent(this, SplashActivity.class));
-                    finish();
-                }
-            } else {
-                super.onActivityResult(requestCode, resultCode, data);
-            }
-        } catch (Exception e) {
-            KioskLogger.log("Activity Result Error: " + e.getMessage());
-        }
+            if (result != null && result.getContents() != null) {
+                getSharedPreferences("KioskConfig", MODE_PRIVATE).edit().putString("server_ip", result.getContents()).apply();
+                startActivity(new Intent(this, SplashActivity.class));
+                finish();
+            } else { super.onActivityResult(requestCode, resultCode, data); }
+        } catch (Exception e) {}
     }
 
     private List<String> getAllowedApps() {
@@ -241,8 +233,6 @@ public class DrawerActivity extends Activity {
                 }
                 Toast.makeText(this, "Memory Optimized.", Toast.LENGTH_SHORT).show();
             }
-        } catch (Exception e) {
-            KioskLogger.log("Clear Recents Error: " + e.getMessage());
-        }
+        } catch (Exception e) {}
     }
 }

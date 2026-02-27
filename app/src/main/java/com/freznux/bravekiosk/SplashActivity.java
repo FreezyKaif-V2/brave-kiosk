@@ -9,6 +9,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.Settings;
 import android.view.Gravity;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
@@ -16,6 +17,7 @@ import android.view.animation.OvershootInterpolator;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import org.json.JSONObject;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
@@ -25,20 +27,22 @@ public class SplashActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        KioskLogger.log("--- Splash Screen Started ---");
+        
+        SharedPreferences prefs = getSharedPreferences("KioskConfig", MODE_PRIVATE);
+        // UNPAUSE the kiosk anytime Splash is launched
+        prefs.edit().putBoolean("kiosk_paused", false).apply(); 
+        
+        String kioskName = prefs.getString("kiosk_name", "Saif M9 Kiosk");
         
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setGravity(Gravity.CENTER);
         
-        GradientDrawable bg = new GradientDrawable(
-            GradientDrawable.Orientation.TOP_BOTTOM,
-            new int[]{Color.parseColor("#0f172a"), Color.parseColor("#020617")}
-        );
+        GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{Color.parseColor("#0f172a"), Color.parseColor("#020617")});
         layout.setBackground(bg);
         
         final TextView title = new TextView(this);
-        title.setText("Saif M9 Kiosk");
+        title.setText(kioskName);
         title.setTextColor(Color.WHITE);
         title.setTextSize(46f);
         title.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
@@ -69,14 +73,12 @@ public class SplashActivity extends Activity {
         tagline.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(800).setInterpolator(new DecelerateInterpolator()).start();
         loader.animate().alpha(1f).setDuration(800).start();
 
-        // Start Network Fetch (Checks if server is alive)
         fetchConfigFromPi();
 
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             title.animate().scaleX(4f).scaleY(4f).alpha(0f).setDuration(400).setInterpolator(new AccelerateInterpolator()).start();
             tagline.animate().scaleX(4f).scaleY(4f).alpha(0f).setDuration(400).setInterpolator(new AccelerateInterpolator()).start();
             loader.animate().alpha(0f).setDuration(300).start();
-            
             new Handler(Looper.getMainLooper()).postDelayed(() -> {
                 Intent i = new Intent(SplashActivity.this, DrawerActivity.class);
                 i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
@@ -91,36 +93,33 @@ public class SplashActivity extends Activity {
         new Thread(() -> {
             SharedPreferences prefs = getSharedPreferences("KioskConfig", MODE_PRIVATE);
             try {
+                String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
                 String baseIp = prefs.getString("server_ip", "http://127.0.0.1:5000");
-                String piUrl = baseIp + "/api/config";
-                KioskLogger.log("Pinging Server: " + piUrl);
+                String piUrl = baseIp + "/api/config?device_id=" + deviceId;
                 
                 URL url = new URL(piUrl);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                // FAST TIMEOUT: Local networks should respond in under 1 second. 
-                // If it fails, the server is offline or IP changed.
                 conn.setConnectTimeout(1000); 
                 conn.setReadTimeout(1000);
                 
-                int responseCode = conn.getResponseCode();
-                
-                if (responseCode == 200) {
+                if (conn.getResponseCode() == 200) {
                     BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
                     StringBuilder response = new StringBuilder();
                     String line;
-                    while ((line = in.readLine()) != null) { response.append(line); }
+                    while ((line = in.readLine()) != null) response.append(line);
                     in.close();
                     
+                    JSONObject json = new JSONObject(response.toString());
+                    String updatedName = json.optString("kiosk_name", "Saif M9 Kiosk");
+                    
                     prefs.edit().putString("json_data", response.toString())
+                         .putString("kiosk_name", updatedName)
                          .putBoolean("server_online", true).apply();
-                    KioskLogger.log("Dynamic config updated. Server is ONLINE.");
                 } else {
                     prefs.edit().putBoolean("server_online", false).apply();
-                    KioskLogger.log("Fetch failed. Code: " + responseCode + ". Server is OFFLINE.");
                 }
             } catch (Exception e) {
                 prefs.edit().putBoolean("server_online", false).apply();
-                KioskLogger.log("Network Exception: Server is OFFLINE. " + e.getMessage());
             }
         }).start();
     }
