@@ -40,6 +40,12 @@ public class DrawerActivity extends Activity {
         buildAestheticUI();
     }
 
+    // THE FIX: Neutralize the Back Button
+    @Override
+    public void onBackPressed() {
+        // Do absolutely nothing. The user is trapped.
+    }
+
     private void buildAestheticUI() {
         SharedPreferences prefs = getSharedPreferences("KioskConfig", MODE_PRIVATE);
         String kioskName = prefs.getString("kiosk_name", "Saif M9 Kiosk");
@@ -128,8 +134,6 @@ public class DrawerActivity extends Activity {
         }
 
         actionsLayout.addView(createActionButton("🧹 Clear Recents & Optimize", "#059669", v -> clearRecents()));
-        
-        // --- NEW EXIT BUTTON ---
         actionsLayout.addView(createActionButton("🚪 Exit Kiosk Mode", "#ef4444", v -> showExitDialog()));
 
         scrollContent.addView(actionsLayout);
@@ -150,7 +154,6 @@ public class DrawerActivity extends Activity {
 
         builder.setPositiveButton("Exit", (dialog, which) -> {
             if (input.getText().toString().equals("0192")) {
-                // Pause the blocker and launch settings
                 getSharedPreferences("KioskConfig", MODE_PRIVATE).edit().putBoolean("kiosk_paused", true).apply();
                 Toast.makeText(DrawerActivity.this, "Kiosk Paused. Change Default Launcher in Settings.", Toast.LENGTH_LONG).show();
                 startActivity(new Intent(android.provider.Settings.ACTION_HOME_SETTINGS));
