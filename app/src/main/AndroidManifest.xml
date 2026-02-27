@@ -10,6 +10,11 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
     
+    <queries>
+        <package android:name="com.brave.browser" />
+        <package android:name="com.android.chrome" />
+    </queries>
+    
     <application
         android:label="Saif M9 Kiosk"
         android:usesCleartextTraffic="true" 
@@ -20,6 +25,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.HOME" />
                 <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 

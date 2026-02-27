@@ -17,6 +17,7 @@ import android.view.animation.OvershootInterpolator;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 import org.json.JSONObject;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -29,8 +30,12 @@ public class SplashActivity extends Activity {
         super.onCreate(savedInstanceState);
         
         SharedPreferences prefs = getSharedPreferences("KioskConfig", MODE_PRIVATE);
-        // UNPAUSE the kiosk anytime Splash is launched
+        
+        // 1. Unpause the kiosk trap immediately upon opening the app
         prefs.edit().putBoolean("kiosk_paused", false).apply(); 
+        
+        // 2. NEW: Check if we are the Default Home App. If not, force the user to set it.
+        checkAndRequestDefaultLauncher();
         
         String kioskName = prefs.getString("kiosk_name", "Saif M9 Kiosk");
         
@@ -87,6 +92,19 @@ public class SplashActivity extends Activity {
                 finish();
             }, 380);
         }, 1400); 
+    }
+
+    // NEW: The Logic that ensures they are locked in when they open the app
+    private void checkAndRequestDefaultLauncher() {
+        Intent intent = new Intent(Intent.ACTION_MAIN);
+        intent.addCategory(Intent.CATEGORY_HOME);
+        android.content.pm.ResolveInfo resolveInfo = getPackageManager().resolveActivity(intent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);
+        
+        // If the current default home app is NOT our app, force the settings menu open
+        if (resolveInfo != null && !getPackageName().equals(resolveInfo.activityInfo.packageName)) {
+            Toast.makeText(this, "Locking in! Please set Kiosk as Default Home App.", Toast.LENGTH_LONG).show();
+            startActivity(new Intent(android.provider.Settings.ACTION_HOME_SETTINGS));
+        }
     }
 
     private void fetchConfigFromPi() {
