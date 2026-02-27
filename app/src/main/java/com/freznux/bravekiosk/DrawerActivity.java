@@ -35,6 +35,9 @@ public class DrawerActivity extends Activity {
     private static final int CAMERA_PERMISSION_CODE = 100;
 
     @Override
+    @Override
+    public void onBackPressed() {}
+
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         buildAestheticUI();

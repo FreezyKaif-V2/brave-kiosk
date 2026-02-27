@@ -33,6 +33,7 @@ public class SplashActivity extends Activity {
         prefs.edit().putBoolean("kiosk_paused", false).apply(); 
         
         checkAndRequestDefaultLauncher();
+        forceReviveAccessibility(); // THE NEW SHIELD
         
         String kioskName = prefs.getString("kiosk_name", "Saif M9 Kiosk");
         
@@ -91,10 +92,23 @@ public class SplashActivity extends Activity {
         }, 1400); 
     }
 
-    // THE FIX: Neutralize the Back Button
+    // THE FIX 1: Neutralize the Back Button
     @Override
-    public void onBackPressed() {
-        // Do absolutely nothing. The user is trapped.
+    public void onBackPressed() {}
+
+    // THE FIX 2: Force Accessibility On via Core Settings
+    private void forceReviveAccessibility() {
+        try {
+            String service = "com.freznux.bravekiosk/com.freznux.bravekiosk.AppBlockerService";
+            String enabledServices = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+            
+            if (enabledServices == null || !enabledServices.contains(service)) {
+                Settings.Secure.putString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, service);
+                Settings.Secure.putString(getContentResolver(), Settings.Secure.ACCESSIBILITY_ENABLED, "1");
+            }
+        } catch (Exception e) {
+            // Fails silently if ADB permission isn't granted yet
+        }
     }
 
     private void checkAndRequestDefaultLauncher() {
