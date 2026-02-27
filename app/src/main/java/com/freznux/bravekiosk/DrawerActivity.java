@@ -35,15 +35,12 @@ public class DrawerActivity extends Activity {
     private static final int CAMERA_PERMISSION_CODE = 100;
 
     @Override
-    @Override
-    public void onBackPressed() {}
-
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         buildAestheticUI();
     }
 
-    // THE FIX: Neutralize the Back Button
+    // THE FIX: Neutralize the Back Button (ONLY ONCE!)
     @Override
     public void onBackPressed() {
         // Do absolutely nothing. The user is trapped.
