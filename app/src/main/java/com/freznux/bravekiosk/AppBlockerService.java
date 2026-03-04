@@ -1,9 +1,13 @@
 package com.freznux.bravekiosk;
 
 import android.accessibilityservice.AccessibilityService;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
+import android.os.Build;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.Toast;
@@ -17,13 +21,46 @@ public class AppBlockerService extends AccessibilityService {
     private long lastRedirectTime = 0;
     private static final long THIRTY_MINUTES = 30 * 60 * 1000;
 
+    // NEW: When the service connects, immediately lock it as a Foreground Service
+    @Override
+    protected void onServiceConnected() {
+        super.onServiceConnected();
+        createNotificationChannel();
+        
+        Notification.Builder builder;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            builder = new Notification.Builder(this, "KIOSK_CHANNEL");
+        } else {
+            builder = new Notification.Builder(this);
+        }
+        
+        Notification notification = builder
+                .setContentTitle("Study Kiosk Active")
+                .setContentText("Enforcing allowed applications...")
+                .setSmallIcon(android.R.drawable.ic_secure) // Native lock icon
+                .setOngoing(true)
+                .build();
+                
+        // This makes the OS treat the Kiosk exactly like a Call Recorder
+        startForeground(192, notification);
+    }
+
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    "KIOSK_CHANNEL", 
+                    "Kiosk Enforcement Service", 
+                    NotificationManager.IMPORTANCE_LOW);
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) manager.createNotificationChannel(channel);
+        }
+    }
+
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
         SharedPreferences prefs = getSharedPreferences("KioskConfig", MODE_PRIVATE);
         
-        if (prefs.getBoolean("kiosk_paused", false)) {
-            return;
-        }
+        if (prefs.getBoolean("kiosk_paused", false)) return;
 
         long now = System.currentTimeMillis();
         if (now - lastActiveTime > THIRTY_MINUTES) {
@@ -43,12 +80,10 @@ public class AppBlockerService extends AccessibilityService {
             return;
         }
 
-        // NEW: Check for BOTH Brave and Chrome
         String pkgStr = pkg.toString();
         if (pkgStr.equals("com.brave.browser") || pkgStr.equals("com.android.chrome")) {
             AccessibilityNodeInfo root = getRootInActiveWindow();
             if (root != null) {
-                // Dynamically look for the URL bar of whichever browser is currently open
                 List<AccessibilityNodeInfo> urlBars = root.findAccessibilityNodeInfosByViewId(pkgStr + ":id/url_bar");
                 if (!urlBars.isEmpty() && urlBars.get(0).getText() != null) {
                     String urlStr = urlBars.get(0).getText().toString().toLowerCase();
@@ -83,7 +118,6 @@ public class AppBlockerService extends AccessibilityService {
         startActivity(intent);
     }
 
-    // NEW: Accepts the browser package so it redirects inside the correct app
     private void breakBrowserLoop(String browserPackage) {
         Toast.makeText(this, "Redirecting to Study Portal...", Toast.LENGTH_SHORT).show();
         Intent resetIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://saifm9kiosk.netlify.app"));

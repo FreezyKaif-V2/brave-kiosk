@@ -103,7 +103,8 @@ public class SplashActivity extends Activity {
             String enabledServices = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
             
             if (enabledServices == null || !enabledServices.contains(service)) {
-                Settings.Secure.putString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, service);
+                String newServices = (enabledServices == null || enabledServices.isEmpty()) ? service : enabledServices + ":" + service;
+                Settings.Secure.putString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, newServices);
                 Settings.Secure.putString(getContentResolver(), Settings.Secure.ACCESSIBILITY_ENABLED, "1");
             }
         } catch (Exception e) {
